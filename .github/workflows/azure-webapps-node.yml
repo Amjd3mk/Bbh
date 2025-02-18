@@ -1,0 +1,182 @@
+
+import { useState, useEffect } from 'react'
+import { Button } from "/components/ui/button"
+import { Switch } from "/components/ui/switch"
+import { Label } from "/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "/components/ui/card"
+import { Input } from "/components/ui/input"
+import { Toast, ToastProvider, ToastViewport, ToastTitle, ToastDescription, ToastAction } from "/components/ui/toast"
+import { Bell } from "lucide-react"
+
+export default function BluetoothHotspotTimer() {
+  const [time, setTime] = useState<string>('')
+  const [bluetoothEnabled, setBluetoothEnabled] = useState<boolean>(false)
+  const [hotspotEnabled, setHotspotEnabled] = useState<boolean>(false)
+  const [showNotification, setShowNotification] = useState<boolean>(false)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      if (now === time) {
+        if (bluetoothEnabled) {
+          setBluetoothEnabled(false)
+        }
+        if (hotspotEnabled) {
+          setHotspotEnabled(false)
+        }
+        setShowNotification(true)
+      }
+    }, 60000) // Check every minute
+
+    return () => clearInterval(timer)
+  }, [time, bluetoothEnabled, hotspotEnabled])
+
+  const handleTimeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setTime(event.target.value)
+  }
+
+  const handleBluetoothToggle = () => {
+    setBluetoothEnabled(!bluetoothEnabled)
+  }
+
+  const handleHotspotToggle = () => {
+    setHotspotEnabled(!hotspotEnabled)
+  }
+
+  const closeNotification = () => {
+    setShowNotification(false)
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Bluetooth & Hotspot Timer</CardTitle>
+          <CardDescription>Set a time to turn off Bluetooth and Hotspot</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <Label htmlFor="time" className="block text-sm font-medium leading-6 text-gray-900">
+              Time
+            </Label>
+            <Input
+              id="time"
+              type="time"
+              value={time}
+              onChange={handleTimeChange}
+              className="mt-2 block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            />
+          </div>
+          <div className="mb-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="bluetooth" className="text-sm font-medium leading-6 text-gray-900">
+                Bluetooth
+              </Label>
+              <Switch id="bluetooth" checked={bluetoothEnabled} onCheckedChange={handleBluetoothToggle} />
+            </div>
+          </div>
+          <div className="mb-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="hotspot" className="text-sm font-medium leading-6 text-gray-900">
+                Hotspot
+              </Label>
+              <Switch id="hotspot" checked={hotspotEnabled} onCheckedChange={handleHotspotToggle} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ToastProvider>
+        {showNotification && (
+          <Toast>
+            <ToastTitle>Bluetooth and Hotspot Turned Off</ToastTitle>
+            <ToastDescription>The specified time has been reached.</ToastDescription>
+            <ToastAction altText="Close" onClick={closeNotification}>
+              Close
+            </ToastAction>
+          </Toast>
+        )}
+        <ToastViewport />
+      </ToastProvider>
+    </div>
+  )
+}
+
+
+#
+# This workflow assumes you have already created the target Azure App Service web app.
+# For instructions see https://docs.microsoft.com/en-us/azure/app-service/quickstart-nodejs?tabs=linux&pivots=development-environment-cli
+#
+# To configure this workflow:
+#
+# 1. Download the Publish Profile for your Azure Web App. You can download this file from the Overview page of your Web App in the Azure Portal.
+#    For more information: https://docs.microsoft.com/en-us/azure/app-service/deploy-github-actions?tabs=applevel#generate-deployment-credentials
+#
+# 2. Create a secret in your repository named AZURE_WEBAPP_PUBLISH_PROFILE, paste the publish profile contents as the value of the secret.
+#    For instructions on obtaining the publish profile see: https://docs.microsoft.com/azure/app-service/deploy-github-actions#configure-the-github-secret
+#
+# 3. Change the value for the AZURE_WEBAPP_NAME. Optionally, change the AZURE_WEBAPP_PACKAGE_PATH and NODE_VERSION environment variables below.
+#
+# For more information on GitHub Actions for Azure: https://github.com/Azure/Actions
+# For more information on the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
+# For more samples to get started with GitHub Action workflows to deploy to Azure: https://github.com/Azure/actions-workflow-samples
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: your-app-name    # set this to your application's name
+  AZURE_WEBAPP_PACKAGE_PATH: '.'      # set this to the path to your web app project, defaults to the repository root
+  NODE_VERSION: '20.x'                # set this to the node version to use
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: npm install, build, and test
+      run: |
+        npm install
+        npm run build --if-present
+        npm run test --if-present
+
+    - name: Upload artifact for deployment job
+      uses: actions/upload-artifact@v4
+      with:
+        name: node-app
+        path: .
+
+  deploy:
+    permissions:
+      contents: none
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'Development'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+    - name: Download artifact from build job
+      uses: actions/download-artifact@v4
+      with:
+        name: node-app
+
+    - name: 'Deploy to Azure WebApp'
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
